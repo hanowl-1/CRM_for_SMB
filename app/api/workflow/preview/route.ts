@@ -407,10 +407,15 @@ export async function POST(request: NextRequest) {
 
             // 🔥 9단계: 변수 치환 (워크플로우 실행과 동일하게)
             console.log(`📋 최종 개인화 변수:`, personalizedVariables);
+            console.log(`🔍 템플릿에서 발견된 변수:`, templateVariableMatches);
+            
             templateVariableMatches.forEach(fullVar => {
               const replacementValue = personalizedVariables[fullVar] || '--';
-              processedContent = processedContent.replace(new RegExp(fullVar.replace(/[{}]/g, '\\\\$&'), 'g'), replacementValue);
+              console.log(`🔄 변수 치환: ${fullVar} → ${replacementValue}`);
+              processedContent = processedContent.replace(new RegExp(fullVar.replace(/[{}]/g, '\\$&'), 'g'), replacementValue);
             });
+            
+            console.log(`📝 치환 후 메시지 (처음 100자):`, processedContent.substring(0, 100));
 
             // 메시지 정보 추가
                 contactPreview.messages.push({
