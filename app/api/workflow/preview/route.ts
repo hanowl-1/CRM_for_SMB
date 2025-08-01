@@ -424,16 +424,17 @@ export async function POST(request: NextRequest) {
                   if (matchedRow) {
                     // AB열(변수 쿼리의 출력 컬럼) → 최종 개인화 값
                     const personalizedValue = matchedRow[mapping.selected_column];
-                    personalizedVariables[mapping.variable_name] = String(personalizedValue || mapping.default_value || '');
+                    // 🔥 워크플로우 실행과 동일하게 #{변수명} 형태로 저장
+                    personalizedVariables[`#{${mapping.variable_name}}`] = String(personalizedValue || mapping.default_value || '');
                     
-                    executionLogs.push(`🔗 매칭 성공: ${mapping.variable_name} = "${personalizedValue}" (${targetMatchingColumn}=${targetMatchingValue})`);
-                    console.log(`🔗 매칭 성공: ${mapping.variable_name} = "${personalizedValue}"`);
+                    executionLogs.push(`🔗 매칭 성공: #{${mapping.variable_name}} = "${personalizedValue}" (${targetMatchingColumn}=${targetMatchingValue})`);
+                    console.log(`🔗 매칭 성공: #{${mapping.variable_name}} = "${personalizedValue}"`);
                     } else {
                     // 매칭 실패 시 기본값 사용
                     const defaultValue = mapping.default_value || getSampleValueForVariable(mapping.variable_name);
-                    personalizedVariables[mapping.variable_name] = defaultValue;
-                    executionLogs.push(`⚠️ 매칭 실패, 기본값 사용: ${mapping.variable_name} = "${defaultValue}" (대상값: ${targetMatchingValue})`);
-                    console.log(`⚠️ 매칭 실패: ${mapping.variable_name}, 대상값: ${targetMatchingValue}, 변수데이터 샘플:`, variableData.slice(0, 3));
+                    personalizedVariables[`#{${mapping.variable_name}}`] = defaultValue;
+                    executionLogs.push(`⚠️ 매칭 실패, 기본값 사용: #{${mapping.variable_name}} = "${defaultValue}" (대상값: ${targetMatchingValue})`);
+                    console.log(`⚠️ 매칭 실패: #{${mapping.variable_name}}, 대상값: ${targetMatchingValue}, 변수데이터 샘플:`, variableData.slice(0, 3));
                     }
                   }
               }
@@ -443,38 +444,40 @@ export async function POST(request: NextRequest) {
             let processedContent = template.content;
             const templateVariableMatches = processedContent.match(/#{([^}]+)}/g) || [];
                   
-            // 발견된 모든 변수에 대해 기본값 설정 (우선순위: 개별 매핑 > 템플릿 개인화 설정 > 샘플 값)
+            // 🔥 실행 로직과 동일하게 변수 설정
             templateVariableMatches.forEach(fullVar => {
-              const variableName = fullVar.replace(/^#{|}$/g, '');
-              
-              // 매칭된 실제 값이 없는 경우에만 기본값 사용
-              if (personalizedVariables[variableName] === undefined) {
-                // 1순위: 템플릿 개인화 설정에서 기본값 찾기
-                const templatePersonalization = templatePersonalizations[template.id];
-                const variableMapping = templatePersonalization?.variableMappings?.find(
-                  (vm: any) => vm.templateVariable === fullVar
-                );
-                
-                if (variableMapping?.defaultValue) {
-                  personalizedVariables[variableName] = variableMapping.defaultValue;
-                  executionLogs.push(`📋 템플릿 개인화 기본값 사용: ${fullVar} = "${variableMapping.defaultValue}"`);
+              if (personalizedVariables[fullVar] === undefined) {
+                // 기본 변수들에 대한 처리
+                const variableNameOnly = fullVar.replace(/^#{|}$/g, '');
+                if (variableNameOnly === 'name') {
+                  personalizedVariables[fullVar] = contactPreview.contact.name;
+                } else if (variableNameOnly === 'company_name') {
+                  personalizedVariables[fullVar] = contactPreview.contact.company || contactPreview.contact.name;
                 } else {
-                  // 2순위: 샘플 값 사용
-                  personalizedVariables[variableName] = getSampleValueForVariable(variableName);
-                  executionLogs.push(`🎲 샘플 값 사용: ${fullVar} = "${personalizedVariables[variableName]}"`);
+                  // 템플릿 개인화 설정에서 기본값 찾기
+                  const templatePersonalization = templatePersonalizations[template.id];
+                  const variableMapping = templatePersonalization?.variableMappings?.find(
+                    (vm: any) => vm.templateVariable === fullVar
+                  );
+                  
+                  if (variableMapping?.defaultValue) {
+                    personalizedVariables[fullVar] = variableMapping.defaultValue;
+                    executionLogs.push(`📋 템플릿 개인화 기본값 사용: ${fullVar} = "${variableMapping.defaultValue}"`);
+                  } else {
+                    // 기본값 설정
+                    personalizedVariables[fullVar] = '--';
+                    executionLogs.push(`🎲 기본값 사용: ${fullVar} = "--"`);
+                  }
                 }
               }
             });
 
-            // 🔥 9단계: 변수 치환 (매칭된 실제 값 우선 사용)
-            for (const [key, value] of Object.entries(personalizedVariables)) {
-              // #{key} 패턴으로 저장된 값이 있으면 그것을 우선 사용
-              const actualValue = personalizedVariables[`#{${key}}`] || personalizedVariables[key] || value;
-              const patterns = [`#{${key}}`, `{${key}}`];
-              patterns.forEach(pattern => {
-                processedContent = processedContent.replace(new RegExp(pattern.replace(/[{}]/g, '\\\\$&'), 'g'), actualValue);
-              });
-            }
+            // 🔥 9단계: 변수 치환 (워크플로우 실행과 동일하게)
+            console.log(`📋 최종 개인화 변수:`, personalizedVariables);
+            templateVariableMatches.forEach(fullVar => {
+              const replacementValue = personalizedVariables[fullVar] || '--';
+              processedContent = processedContent.replace(new RegExp(fullVar.replace(/[{}]/g, '\\\\$&'), 'g'), replacementValue);
+            });
 
             // 메시지 정보 추가
                 contactPreview.messages.push({
