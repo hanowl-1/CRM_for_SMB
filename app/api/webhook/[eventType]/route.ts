@@ -221,7 +221,7 @@ async function executeWorkflowImmediately(
   try {
     // 워크플로우 실행 API 호출
     const baseUrl = process.env.NODE_ENV === 'production' 
-      ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://crm-for-smb.vercel.app')
+      ? 'https://crm-for-smb.vercel.app'  // 🔥 공개 도메인 사용
       : 'http://localhost:3000';
     
     console.log(`🌐 워크플로우 실행 API 호출 베이스 URL: ${baseUrl}`);
