@@ -77,11 +77,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 🔥 동적 베이스 URL 결정
+    // 🔥 동적 베이스 URL 결정 - production domain 우선 사용
     const baseUrl = process.env.NODE_ENV === 'production' 
-      ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-         process.env.VERCEL_PROJECT_URL ? `https://${process.env.VERCEL_PROJECT_URL}` : 
-         'https://crm-for-smb.vercel.app')
+      ? (process.env.VERCEL_PROJECT_URL ? `https://${process.env.VERCEL_PROJECT_URL}` :
+         'https://crm-for-smb.vercel.app') // 실제 production domain 사용
       : 'http://localhost:3000';
 
     executionLogs.push('🚀 워크플로우 미리보기 시작');
