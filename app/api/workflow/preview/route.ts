@@ -302,7 +302,8 @@ export async function POST(request: NextRequest) {
         // Timeout 설정 (20초)
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 20000);
-
+        
+        let result: any;
         try {
           const response = await fetch(`${baseUrl}/api/mysql/query`, {
             method: 'POST',
@@ -322,13 +323,8 @@ export async function POST(request: NextRequest) {
             throw new Error(`MySQL API 호출 실패: ${response.status} - ${errorText}`);
           }
 
-          const result = await response.json();
+          result = await response.json();
           console.log(`📋 MySQL API 응답:`, { success: result.success, dataLength: result.data?.rows?.length });
-
-          if (!result.success || !result.data || !result.data.rows || result.data.rows.length === 0) {
-            executionLogs.push(`⚠️ 그룹 "${group.name}"에서 데이터 없음`);
-            continue;
-          }
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (fetchError instanceof Error && fetchError.name === 'AbortError') {
@@ -338,6 +334,11 @@ export async function POST(request: NextRequest) {
             executionLogs.push(`❌ 대상자 쿼리 네트워크 오류: ${group.name} - ${fetchError instanceof Error ? fetchError.message : '알 수 없는 오류'}`);
             throw fetchError;
           }
+        }
+
+        if (!result.success || !result.data || !result.data.rows || result.data.rows.length === 0) {
+          executionLogs.push(`⚠️ 그룹 "${group.name}"에서 데이터 없음`);
+          continue;
         }
 
         const contacts = result.data.rows;
