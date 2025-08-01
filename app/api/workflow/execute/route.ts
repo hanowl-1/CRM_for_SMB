@@ -1610,7 +1610,7 @@ async function getTargetsFromGroup(targetGroup: any) {
       try {
         // 🔥 미리보기 API와 동일한 방식: MySQL API 호출
         const baseUrl = process.env.NODE_ENV === 'production' 
-          ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://v0-kakao-beryl.vercel.app')
+          ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://crm-for-smb.vercel.app')
           : 'http://localhost:3000';
 
         const response = await fetch(`${baseUrl}/api/mysql/query`, {
