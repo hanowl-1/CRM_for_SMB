@@ -130,8 +130,16 @@ async function triggerWebhookWorkflows(eventType: string, eventData: WebhookEven
       const conditions = triggerConfig.conditions || [];
       const conditionLogic = triggerConfig.conditionLogic || 'AND';
       
+      console.log(`🔍 조건 평가: ${workflow.name} - 조건 ${conditions.length}개`);
       
-      const conditionsPassed = evaluateConditions(eventData, conditions, conditionLogic);
+      // 🔥 조건이 없으면 자동으로 통과
+      let conditionsPassed = true;
+      if (conditions.length > 0) {
+        conditionsPassed = evaluateConditions(eventData, conditions, conditionLogic);
+        console.log(`📋 조건 평가 결과: ${conditionsPassed}`);
+      } else {
+        console.log(`✅ 조건 없음 - 자동 통과: ${workflow.name}`);
+      }
       
       if (!conditionsPassed) {
         
@@ -152,8 +160,11 @@ async function triggerWebhookWorkflows(eventType: string, eventData: WebhookEven
 
       // 스케줄 설정에 따른 실행 방식 결정
       const scheduleConfig = workflow.schedule_config || {};
+      const scheduleType = scheduleConfig.type || 'immediate';
       
-      if (scheduleConfig.type === 'immediate') {
+      console.log(`📋 스케줄 타입: ${scheduleType}`);
+      
+      if (scheduleType === 'immediate') {
         // 즉시실행: 바로 워크플로우 실행
         const executionResult = await executeWorkflowImmediately(workflow, eventData, eventType);
         triggeredWorkflows.push({
@@ -219,6 +230,8 @@ async function executeWorkflowImmediately(
       headers: {
         'Content-Type': 'application/json',
         'x-scheduler-internal': 'true',
+        'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '',
+        'x-vercel-set-bypass-cookie': 'true',
       },
       body: JSON.stringify({
         workflowId: workflow.id,
