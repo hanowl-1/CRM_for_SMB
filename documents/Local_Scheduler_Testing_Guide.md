@@ -16,7 +16,7 @@ NODE_ENV=development
 CRON_SECRET_TOKEN=c7f3c323144444ca876786803871097a
 
 # Vercel 프로젝트 URL (프로덕션용)
-VERCEL_PROJECT_URL=v0-kakao-beryl.vercel.app
+VERCEL_PROJECT_URL=crm-for-smb.vercel.app
 
 # Supabase 설정
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
