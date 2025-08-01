@@ -23,11 +23,11 @@ const SMS_SENDER_NUMBER = process.env.SMS_SENDER_NUMBER;
 
 // MySQL 설정
 const dbConfig = {
-  host: process.env.MYSQL_HOST || 'localhost',
-  port: parseInt(process.env.MYSQL_PORT || '3306'),
-  user: process.env.MYSQL_USER || 'root',
-  password: process.env.MYSQL_PASSWORD || '',
-  database: process.env.MYSQL_DATABASE || 'test',
+  host: process.env.MYSQL_READONLY_HOST || 'localhost',
+  port: parseInt(process.env.MYSQL_READONLY_PORT || '3306'),
+  user: process.env.MYSQL_READONLY_USER || 'root',
+  password: process.env.MYSQL_READONLY_PASSWORD || '',
+  database: process.env.MYSQL_READONLY_DATABASE || 'test',
   timezone: '+09:00'
 };
 

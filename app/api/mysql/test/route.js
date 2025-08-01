@@ -7,11 +7,11 @@ export async function GET() {
     
     // 환경변수 확인
     const envVars = {
-      host: process.env.MYSQL_HOST,
-      port: process.env.MYSQL_PORT,
-      user: process.env.MYSQL_USER,
-      hasPassword: !!process.env.MYSQL_PASSWORD,
-      database: process.env.MYSQL_DATABASE
+      host: process.env.MYSQL_READONLY_HOST,
+      port: process.env.MYSQL_READONLY_PORT,
+      user: process.env.MYSQL_READONLY_USER,
+      hasPassword: !!process.env.MYSQL_READONLY_PASSWORD,
+      database: process.env.MYSQL_READONLY_DATABASE
     };
     
     console.log('MySQL 환경변수 상태:', envVars);
@@ -24,11 +24,11 @@ export async function GET() {
         message: '필요한 MySQL 환경변수가 설정되지 않았습니다.',
         envStatus: envVars,
         required: {
-          MYSQL_HOST: '필수',
-          MYSQL_USER: '필수',
-          MYSQL_PASSWORD: '필수',
-          MYSQL_DATABASE: '필수',
-          MYSQL_PORT: '선택사항 (기본값: 3306)'
+          MYSQL_READONLY_HOST: '필수',
+          MYSQL_READONLY_USER: '필수',
+          MYSQL_READONLY_PASSWORD: '필수',
+          MYSQL_READONLY_DATABASE: '필수',
+          MYSQL_READONLY_PORT: '선택사항 (기본값: 3306)'
         }
       }, { status: 500 });
     }
