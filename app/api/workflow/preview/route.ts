@@ -87,17 +87,18 @@ export async function POST(request: NextRequest) {
     executionLogs.push('🚀 워크플로우 미리보기 시작');
     executionLogs.push(`🌐 베이스 URL: ${baseUrl}`);
     executionLogs.push(`🔧 환경: ${process.env.NODE_ENV}`);
-    executionLogs.push(`🔑 VERCEL_URL: ${process.env.VERCEL_URL ? '설정됨' : '없음'}`);
-    executionLogs.push(`🔑 VERCEL_PROJECT_URL: ${process.env.VERCEL_PROJECT_URL ? '설정됨' : '없음'}`);
+    executionLogs.push(`🔑 VERCEL_URL: ${process.env.VERCEL_URL ? `설정됨 (${process.env.VERCEL_URL})` : '없음'}`);
+    executionLogs.push(`🔑 VERCEL_PROJECT_URL: ${process.env.VERCEL_PROJECT_URL ? `설정됨 (${process.env.VERCEL_PROJECT_URL})` : '없음'}`);
     executionLogs.push(`🔑 BYPASS_SECRET: ${process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? '설정됨' : '없음'}`);
     
     console.log('🚀 워크플로우 미리보기 시작');
     console.log('🌐 베이스 URL:', baseUrl);
     console.log('🔧 환경 변수 상태:', {
       NODE_ENV: process.env.NODE_ENV,
-      VERCEL_URL: !!process.env.VERCEL_URL,
-      VERCEL_PROJECT_URL: !!process.env.VERCEL_PROJECT_URL,
-      BYPASS_SECRET: !!process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+      VERCEL_URL: process.env.VERCEL_URL || 'undefined',
+      VERCEL_PROJECT_URL: process.env.VERCEL_PROJECT_URL || 'undefined',
+      BYPASS_SECRET: !!process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+      ALL_VERCEL_VARS: Object.keys(process.env).filter(key => key.startsWith('VERCEL_'))
     });
     console.log('📋 템플릿 개인화 설정:', templatePersonalizations);
 

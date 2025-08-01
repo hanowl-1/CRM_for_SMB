@@ -176,11 +176,11 @@ export async function GET(request: NextRequest) {
     
     /**
      * 🕐 시간대 처리 원칙:
-     * - 저장: UTC로 DB 저장 (서버 환경 독립적)
-     * - 비교: UTC 기준으로 실행 시간 판단 (정확한 비교)
+     * - 저장: 한국시간 문자열로 저장 (TEXT 타입)
+     * - 비교: 한국시간 기준으로 실행 시간 판단 (일관성 유지)
      * - 표시: 사용자에게는 KST로 표시
      */
-    const now = new Date(); // 🔥 현재 UTC 시간 사용 (정확한 비교를 위해)
+    const now = getKoreaTime(); // 🔥 현재 한국 시간 사용 (scheduled_time과 동일한 기준)
     const currentTimeString = formatKoreaTime(now); // 표시용은 한국시간으로
     
     console.log(`⏰ 현재 한국 시간: ${currentTimeString}`);
@@ -359,12 +359,19 @@ export async function GET(request: NextRequest) {
         scheduledTimeKST = new Date(job.scheduled_time);
       }
       
-      // 시간 차이 계산 (초 단위)
+      // 시간 차이 계산 (초 단위) - 한국시간 기준
       const timeDiffSeconds = Math.floor((now.getTime() - scheduledTimeKST.getTime()) / 1000);
       
       // 🔥 허용 오차를 1분으로 축소 - 정확한 실행 시간 보장 및 중복 실행 방지
       const TOLERANCE_MS = 1 * 60 * 1000; // 1분 = 60초 (기존 10분에서 축소)
       const isTimeToExecute = now.getTime() >= (scheduledTimeKST.getTime() - TOLERANCE_MS);
+      
+      console.log(`⏰ 시간 비교 (${job.workflow_data?.name}):`, {
+        현재한국시간: formatKoreaTime(now),
+        예정한국시간: formatKoreaTime(scheduledTimeKST),
+        차이초: timeDiffSeconds,
+        실행가능: isTimeToExecute
+      });
       
       debugInfo.push({
         id: job.id,
