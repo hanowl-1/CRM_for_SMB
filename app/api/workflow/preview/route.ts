@@ -322,12 +322,22 @@ export async function POST(request: NextRequest) {
             throw new Error(`MySQL API 호출 실패: ${response.status} - ${errorText}`);
           }
 
-        const result = await response.json();
-        console.log(`📋 MySQL API 응답:`, { success: result.success, dataLength: result.data?.rows?.length });
+          const result = await response.json();
+          console.log(`📋 MySQL API 응답:`, { success: result.success, dataLength: result.data?.rows?.length });
 
-        if (!result.success || !result.data || !result.data.rows || result.data.rows.length === 0) {
-          executionLogs.push(`⚠️ 그룹 "${group.name}"에서 데이터 없음`);
-          continue;
+          if (!result.success || !result.data || !result.data.rows || result.data.rows.length === 0) {
+            executionLogs.push(`⚠️ 그룹 "${group.name}"에서 데이터 없음`);
+            continue;
+          }
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            executionLogs.push(`⏰ 대상자 쿼리 타임아웃: ${group.name}`);
+            throw new Error(`대상자 쿼리 타임아웃: ${group.name}`);
+          } else {
+            executionLogs.push(`❌ 대상자 쿼리 네트워크 오류: ${group.name} - ${fetchError instanceof Error ? fetchError.message : '알 수 없는 오류'}`);
+            throw fetchError;
+          }
         }
 
         const contacts = result.data.rows;
