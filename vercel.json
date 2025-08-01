@@ -19,13 +19,13 @@
   ],
   "functions": {
     "app/api/**/*.ts": {
-      "maxDuration": 10
+      "maxDuration": 30
     },
     "app/api/scheduler/**/*.ts": {
-      "maxDuration": 10
+      "maxDuration": 30
     },
     "app/api/workflow/**/*.ts": {
-      "maxDuration": 10
+      "maxDuration": 60
     }
   }
 } 
