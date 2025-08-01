@@ -130,10 +130,21 @@ async function triggerWebhookWorkflows(eventType: string, eventData: WebhookEven
       const conditions = triggerConfig.conditions || [];
       const conditionLogic = triggerConfig.conditionLogic || 'AND';
       
+      
       const conditionsPassed = evaluateConditions(eventData, conditions, conditionLogic);
       
       if (!conditionsPassed) {
-        console.log(`❌ 조건 불만족: ${workflow.name}`);
+        
+        
+        triggeredWorkflows.push({
+          workflowId: workflow.id,
+          workflowName: workflow.name,
+          error: `조건 불만족: ${conditions.length}개 조건 중 통과하지 못함`,
+          conditionsPassed: false,
+          conditions: conditions,
+          eventData: eventData,
+          conditionLogic: conditionLogic
+        });
         continue;
       }
 
@@ -198,7 +209,11 @@ async function executeWorkflowImmediately(
   
   try {
     // 워크플로우 실행 API 호출
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://crm-for-smb.vercel.app')
+      : 'http://localhost:3000';
+    
+    console.log(`🌐 워크플로우 실행 API 호출 베이스 URL: ${baseUrl}`);
     const response = await fetch(`${baseUrl}/api/workflow/execute`, {
       method: 'POST',
       headers: {
