@@ -141,8 +141,10 @@ export class ClientPersonalizationService {
 
       const result = await response.json();
       
-      if (result.success && result.data && result.data.length > 0) {
-        const row = result.data[0];
+      // API 응답 구조 수정: data.rows 필드 사용
+      const data = result.data?.rows || result.rows || result.data || [];
+      if (result.success && data && data.length > 0) {
+        const row = data[0];
         
         // 선택된 컬럼이 있으면 해당 컬럼 값 반환, 없으면 첫 번째 컬럼 값 반환
         if (selectedColumn && row.hasOwnProperty(selectedColumn)) {
@@ -295,23 +297,44 @@ export class ClientPersonalizationService {
       const result = await response.json();
       console.log('Query result:', result);
       
-      if (result.success && result.data && result.data.length > 0) {
-        const firstRow = result.data[0];
-        const columns = Object.keys(firstRow);
-        
-        return {
-          success: true,
-          result: firstRow[columns[0]], // 기본값: 첫 번째 컬럼
-          columns: columns,
-          data: result.data
-        };
+      // API 응답 구조 수정: data.rows 필드 사용
+      const data = result.data?.rows || result.rows || result.data || [];
+      console.log('Processed data:', data);
+      
+      if (result.success) {
+        if (data && data.length > 0) {
+          const firstRow = data[0];
+          const columns = Object.keys(firstRow);
+          console.log('Available columns:', columns);
+          console.log('First row data:', firstRow);
+          
+          const firstColumnValue = firstRow[columns[0]];
+          console.log('First column value:', firstColumnValue);
+          
+          return {
+            success: true,
+            result: firstColumnValue, // 기본값: 첫 번째 컬럼
+            columns: columns,
+            data: data
+          };
+        } else {
+          console.log('No data returned from query');
+          return {
+            success: true,
+            result: null,
+            columns: [],
+            data: [],
+            message: '쿼리는 성공했지만 결과가 없습니다.'
+          };
+        }
       }
       
       return {
-        success: true,
+        success: false,
         result: null,
         columns: [],
-        data: []
+        data: [],
+        error: '쿼리 실행 실패'
       };
     } catch (error) {
       console.error('Test query error:', error);
