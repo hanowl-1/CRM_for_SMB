@@ -77,10 +77,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 🔥 동적 베이스 URL 결정 - production domain 우선 사용
+    // 🔥 동적 베이스 URL 결정
     const baseUrl = process.env.NODE_ENV === 'production' 
-      ? (process.env.VERCEL_PROJECT_URL ? `https://${process.env.VERCEL_PROJECT_URL}` :
-         'https://crm-for-smb.vercel.app') // 실제 production domain 사용
+      ? 'https://crm-for-smb.vercel.app' // 실제 프로덕션 도메인 직접 사용
       : 'http://localhost:3000';
 
     executionLogs.push('🚀 워크플로우 미리보기 시작');
@@ -473,7 +472,7 @@ export async function POST(request: NextRequest) {
               const actualValue = personalizedVariables[`#{${key}}`] || personalizedVariables[key] || value;
               const patterns = [`#{${key}}`, `{${key}}`];
               patterns.forEach(pattern => {
-                processedContent = processedContent.replace(new RegExp(pattern.replace(/[{}]/g, '\\$&'), 'g'), actualValue);
+                processedContent = processedContent.replace(new RegExp(pattern.replace(/[{}]/g, '\\\\$&'), 'g'), actualValue);
               });
             }
 
