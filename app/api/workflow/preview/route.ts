@@ -84,20 +84,7 @@ export async function POST(request: NextRequest) {
 
     executionLogs.push('🚀 워크플로우 미리보기 시작');
     executionLogs.push(`🌐 베이스 URL: ${baseUrl}`);
-    executionLogs.push(`🔧 환경: ${process.env.NODE_ENV}`);
-    executionLogs.push(`🔑 VERCEL_URL: ${process.env.VERCEL_URL ? `설정됨 (${process.env.VERCEL_URL})` : '없음'}`);
-    executionLogs.push(`🔑 VERCEL_PROJECT_URL: ${process.env.VERCEL_PROJECT_URL ? `설정됨 (${process.env.VERCEL_PROJECT_URL})` : '없음'}`);
-    executionLogs.push(`🔑 BYPASS_SECRET: ${process.env.VERCEL_AUTOMATION_BYPASS_SECRET ? '설정됨' : '없음'}`);
-    
     console.log('🚀 워크플로우 미리보기 시작');
-    console.log('🌐 베이스 URL:', baseUrl);
-    console.log('🔧 환경 변수 상태:', {
-      NODE_ENV: process.env.NODE_ENV,
-      VERCEL_URL: process.env.VERCEL_URL || 'undefined',
-      VERCEL_PROJECT_URL: process.env.VERCEL_PROJECT_URL || 'undefined',
-      BYPASS_SECRET: !!process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
-      ALL_VERCEL_VARS: Object.keys(process.env).filter(key => key.startsWith('VERCEL_'))
-    });
     console.log('📋 템플릿 개인화 설정:', templatePersonalizations);
 
     // 🔥 1단계: 실제 알림톡 템플릿 데이터 로드
@@ -185,71 +172,43 @@ export async function POST(request: NextRequest) {
             console.log(`📝 쿼리: ${mapping.source_field}`);
 
             // MySQL API 호출 - 전체 데이터 조회
-            const fetchHeaders: Record<string, string> = {
-              'Content-Type': 'application/json'
-            };
-            
-            // Vercel protection bypass (프로덕션에서만)
-            if (process.env.NODE_ENV === 'production' && process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-              fetchHeaders['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-              fetchHeaders['x-vercel-set-bypass-cookie'] = 'true';
-            }
+            const variableResponse = await fetch(`${baseUrl}/api/mysql/query`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '',
+                'x-vercel-set-bypass-cookie': 'true'
+              },
+              body: JSON.stringify({ 
+                query: mapping.source_field,
+                limit: 10000 // 충분한 데이터 로드
+              })
+            });
 
-            // Timeout 설정 (30초)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-            try {
-              const variableResponse = await fetch(`${baseUrl}/api/mysql/query`, {
-                method: 'POST',
-                headers: fetchHeaders,
-                body: JSON.stringify({ 
-                  query: mapping.source_field,
-                  limit: 10000 // 충분한 데이터 로드
-                }),
-                signal: controller.signal
-              });
-
-              clearTimeout(timeoutId);
-
-              if (variableResponse.ok) {
-                const variableResult = await variableResponse.json();
-                if (variableResult.success && variableResult.data && variableResult.data.rows) {
-                  const rows = variableResult.data.rows;
-                  variableDataCache.set(mapping.variable_name, rows);
-                  executionLogs.push(`✅ 변수 데이터 캐시됨: ${mapping.variable_name} (${rows.length}개 행)`);
-                  console.log(`✅ 변수 데이터 캐시됨: ${mapping.variable_name}`, {
-                    rowCount: rows.length,
-                    sampleData: rows.slice(0, 3),
-                    keyColumn: mapping.key_column,
-                    outputColumn: mapping.selected_column,
-                    query: mapping.source_field
-                  });
-                  
-                  // 실행 로그에도 쿼리와 샘플 데이터 추가
-                  executionLogs.push(`📝 쿼리: ${mapping.source_field}`);
-                  executionLogs.push(`📊 샘플 데이터: ${JSON.stringify(rows.slice(0, 2))}`);
-                } else {
-                  executionLogs.push(`❌ 변수 쿼리 결과 없음: ${mapping.variable_name} - ${JSON.stringify(variableResult)}`);
-                }
-              } else {
-                const errorText = await variableResponse.text();
-                executionLogs.push(`❌ 변수 쿼리 API 호출 실패: ${mapping.variable_name} (${variableResponse.status}) - ${errorText}`);
-                console.error(`❌ MySQL API 오류 (${mapping.variable_name}):`, {
-                  status: variableResponse.status,
-                  statusText: variableResponse.statusText,
-                  errorText,
-                  headers: Object.fromEntries(variableResponse.headers.entries())
+            if (variableResponse.ok) {
+              const variableResult = await variableResponse.json();
+              if (variableResult.success && variableResult.data && variableResult.data.rows) {
+                const rows = variableResult.data.rows;
+                variableDataCache.set(mapping.variable_name, rows);
+                executionLogs.push(`✅ 변수 데이터 캐시됨: ${mapping.variable_name} (${rows.length}개 행)`);
+                console.log(`✅ 변수 데이터 캐시됨: ${mapping.variable_name}`, {
+                  rowCount: rows.length,
+                  sampleData: rows.slice(0, 3),
+                  keyColumn: mapping.key_column,
+                  outputColumn: mapping.selected_column,
+                  query: mapping.source_field
                 });
-              }
-            } catch (fetchError) {
-              clearTimeout(timeoutId);
-              if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-                executionLogs.push(`⏰ 변수 쿼리 타임아웃: ${mapping.variable_name}`);
+                
+                // 실행 로그에도 쿼리와 샘플 데이터 추가
+                executionLogs.push(`📝 쿼리: ${mapping.source_field}`);
+                executionLogs.push(`📊 샘플 데이터: ${JSON.stringify(rows.slice(0, 2))}`);
               } else {
-                executionLogs.push(`❌ 변수 쿼리 네트워크 오류: ${mapping.variable_name} - ${fetchError instanceof Error ? fetchError.message : '알 수 없는 오류'}`);
+                executionLogs.push(`❌ 변수 쿼리 결과 없음: ${mapping.variable_name}`);
               }
-              console.error(`❌ 변수 쿼리 fetch 오류 (${mapping.variable_name}):`, fetchError);
+            } else {
+              const errorText = await variableResponse.text();
+              executionLogs.push(`❌ 변수 쿼리 API 호출 실패: ${mapping.variable_name} (${variableResponse.status})`);
+              console.error(`❌ MySQL API 오류 (${mapping.variable_name}):`, errorText);
             }
           } catch (queryError) {
             console.error(`❌ 변수 쿼리 실행 오류 (${mapping.variable_name}):`, queryError);
@@ -288,52 +247,26 @@ export async function POST(request: NextRequest) {
         console.log(`📊 대상자 쿼리 실행: ${limitedQuery}`);
 
         // MySQL API 호출
-        const fetchHeaders: Record<string, string> = {
-          'Content-Type': 'application/json'
-        };
-        
-        // Vercel protection bypass (프로덕션에서만)
-        if (process.env.NODE_ENV === 'production' && process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-          fetchHeaders['x-vercel-protection-bypass'] = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-          fetchHeaders['x-vercel-set-bypass-cookie'] = 'true';
+        const response = await fetch(`${baseUrl}/api/mysql/query`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '',
+            'x-vercel-set-bypass-cookie': 'true'
+          },
+          body: JSON.stringify({ 
+            query: limitedQuery,
+            limit: 5
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`MySQL API 호출 실패: ${response.status} - ${errorText}`);
         }
 
-        // Timeout 설정 (20초)
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
-        
-        let result: any;
-        try {
-          const response = await fetch(`${baseUrl}/api/mysql/query`, {
-            method: 'POST',
-            headers: fetchHeaders,
-            body: JSON.stringify({ 
-              query: limitedQuery,
-              limit: 5
-            }),
-            signal: controller.signal
-          });
-
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            executionLogs.push(`❌ 대상자 쿼리 API 호출 실패: ${response.status} - ${errorText}`);
-            throw new Error(`MySQL API 호출 실패: ${response.status} - ${errorText}`);
-          }
-
-          result = await response.json();
-          console.log(`📋 MySQL API 응답:`, { success: result.success, dataLength: result.data?.rows?.length });
-        } catch (fetchError) {
-          clearTimeout(timeoutId);
-          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-            executionLogs.push(`⏰ 대상자 쿼리 타임아웃: ${group.name}`);
-            throw new Error(`대상자 쿼리 타임아웃: ${group.name}`);
-          } else {
-            executionLogs.push(`❌ 대상자 쿼리 네트워크 오류: ${group.name} - ${fetchError instanceof Error ? fetchError.message : '알 수 없는 오류'}`);
-            throw fetchError;
-          }
-        }
+        const result = await response.json();
+        console.log(`📋 MySQL API 응답:`, { success: result.success, dataLength: result.data?.rows?.length });
 
         if (!result.success || !result.data || !result.data.rows || result.data.rows.length === 0) {
           executionLogs.push(`⚠️ 그룹 "${group.name}"에서 데이터 없음`);

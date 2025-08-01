@@ -622,7 +622,7 @@ export async function POST(request: NextRequest) {
           try {
           console.log(`💾 메시지 로그 저장 시작: ${allMessageLogs.length}개`);
             const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === 'production' 
-              ? 'https://crm-for-smb.vercel.app'
+              ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://your-domain.vercel.app')
               : 'http://localhost:3000')}/api/supabase/message-logs`, {
               method: 'POST',
               headers: {
@@ -1260,7 +1260,7 @@ async function executeStep(step: any, targetGroup: any, workflow: Workflow, enab
     // 🔥 변수 쿼리 실행 및 캐싱 (미리보기 API와 동일한 로직)
     const variableDataCache = new Map<string, any[]>();
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || (process.env.NODE_ENV === 'production' 
-      ? 'https://crm-for-smb.vercel.app'
+      ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://your-domain.vercel.app')
       : 'http://localhost:3000');
 
     console.log('🌐 베이스 URL:', baseUrl);
@@ -1610,7 +1610,7 @@ async function getTargetsFromGroup(targetGroup: any) {
       try {
         // 🔥 미리보기 API와 동일한 방식: MySQL API 호출
         const baseUrl = process.env.NODE_ENV === 'production' 
-          ? 'https://crm-for-smb.vercel.app' // 실제 production domain 사용
+          ? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://crm-for-smb.vercel.app')
           : 'http://localhost:3000';
 
         const response = await fetch(`${baseUrl}/api/mysql/query`, {
