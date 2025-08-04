@@ -88,6 +88,8 @@ export function WorkflowBuilder({
   onSave,
   onTest,
 }: WorkflowBuilderProps) {
+  console.log("🚀 워크플로우 저장 데이터:", workflow);
+
   // 기본정보 탭
   const [activeTab, setActiveTab] = useState("basic");
   const [name, setName] = useState(workflow?.name || "");
@@ -103,8 +105,19 @@ export function WorkflowBuilder({
   const [selectedTemplates, setSelectedTemplates] = useState<KakaoTemplate[]>(
     workflow?.message_config?.selectedTemplates || []
   );
+
   const [steps, setSteps] = useState<WorkflowStep[]>(
     workflow?.message_config?.steps || []
+  );
+
+  // 메시지 타입 선택 (카카오톡 알림톡 vs SMS)
+  const [messageType, setMessageType] = useState<"send_alimtalk" | "send_sms">(
+    () => {
+      // 기존 워크플로우에서 첫 번째 스텝의 액션 타입을 확인
+      const firstStepActionType =
+        workflow?.message_config?.steps?.[0]?.action?.type;
+      return firstStepActionType === "send_sms" ? "send_sms" : "send_alimtalk";
+    }
   );
 
   // 대상 선정 탭
@@ -203,8 +216,6 @@ export function WorkflowBuilder({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [totalEstimatedCount, setTotalEstimatedCount] = useState(0);
 
-  // console.log("🔥 workflow", workflow);
-
   // 기존 워크플로우 로드 시 변수와 개인화 설정 초기화
   useEffect(() => {
     if (workflow && workflow.message_config?.steps) {
@@ -226,7 +237,11 @@ export function WorkflowBuilder({
           templateId: step.action.templateId,
         });
 
-        if (step.action.templateId && step.action.type === "send_alimtalk") {
+        if (
+          step.action.templateId &&
+          (step.action.type === "send_alimtalk" ||
+            step.action.type === "send_sms")
+        ) {
           // 변수 저장
           if (step.action.variables) {
             variables[step.action.templateId] = step.action.variables;
@@ -609,7 +624,7 @@ export function WorkflowBuilder({
           name: `${template.templateName} 발송`,
           action: {
             id: `action_${template.id}_${Date.now()}`,
-            type: "send_alimtalk",
+            type: messageType,
             templateId: template.id,
             templateCode: template.templateCode,
             templateName: template.templateName,
@@ -754,7 +769,7 @@ export function WorkflowBuilder({
         name: `${template.templateName} 발송`,
         action: {
           id: `action_${template.id}_${Date.now()}`,
-          type: "send_alimtalk",
+          type: messageType,
           templateId: template.id,
           templateCode: template.templateCode,
           templateName: template.templateName,
@@ -1360,15 +1375,67 @@ export function WorkflowBuilder({
           </div>
         </TabsContent>
 
-        {/* 알림톡 선택 탭 */}
+        {/* 메시지 선택 탭 */}
         <TabsContent value="templates" className="space-y-6">
+          {/* 메시지 타입 선택 */}
+          <Card>
+            <CardHeader>
+              <CardTitle>메시지 전송 방식 선택</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                워크플로우에서 사용할 메시지 전송 방식을 선택하세요
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setMessageType("send_alimtalk")}
+                  className={`flex-1 p-4 rounded-lg border-2 transition-colors ${
+                    messageType === "send_alimtalk"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className="text-lg font-semibold">
+                      📱 카카오톡 알림톡
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      높은 도달률, 템플릿 기반 발송
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setMessageType("send_sms")}
+                  className={`flex-1 p-4 rounded-lg border-2 transition-colors ${
+                    messageType === "send_sms"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <div className="text-center">
+                    <div className="text-lg font-semibold">💬 SMS/LMS</div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      빠른 전송, 템플릿 기반 발송
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>알림톡 템플릿 선택</CardTitle>
+                  <CardTitle>
+                    {messageType === "send_alimtalk"
+                      ? "알림톡 템플릿 선택"
+                      : "SMS 템플릿 선택"}
+                  </CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    이 워크플로우에서 발송할 알림톡 템플릿을 선택하세요
+                    {messageType === "send_alimtalk"
+                      ? "이 워크플로우에서 발송할 알림톡 템플릿을 선택하세요"
+                      : "이 워크플로우에서 SMS로 발송할 템플릿을 선택하세요"}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -2728,7 +2795,7 @@ export function WorkflowBuilder({
                           name: `${template.templateName} 발송`,
                           action: {
                             id: `action_${template.id}_${Date.now()}`,
-                            type: "send_alimtalk",
+                            type: messageType,
                             templateId: template.id,
                             templateCode: template.templateCode,
                             templateName: template.templateName,
@@ -2742,6 +2809,7 @@ export function WorkflowBuilder({
                         selectedTemplates,
                       },
                     };
+                    console.log("🚀 워크플로우 저장 데이터:", workflowData);
 
                     // console.log("🚀 워크플로우 저장 데이터:", {
                     //   name: workflowData.name,
