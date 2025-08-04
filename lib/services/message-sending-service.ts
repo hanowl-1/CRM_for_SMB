@@ -101,7 +101,7 @@ async function sendAlimtalk(request: MessageSendRequest): Promise<MessageSendRes
       messageLength: request.message.length
     });
     
-    if (request.enableRealSending && !TEST_CONFIG.isTestMode) {
+    if (request.enableRealSending) {
       const result = await messageAgent.send(alimtalkOptions);
       console.log('✅ 알림톡 발송 성공:', result);
       
@@ -159,7 +159,7 @@ async function sendSmsLms(
       messageLength: request.message.length
     });
     
-    if (request.enableRealSending && !TEST_CONFIG.isTestMode) {
+    if (request.enableRealSending) {
       const result = await messageAgent.send(smsOptions);
       console.log(`✅ ${messageType.toUpperCase()} 발송 성공:`, result);
       

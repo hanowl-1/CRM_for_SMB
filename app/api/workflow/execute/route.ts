@@ -519,7 +519,7 @@ export async function POST(request: NextRequest) {
       for (let i = 0; i < messageSteps.length; i++) {
         const step = messageSteps[i];
         
-        if (step.action.type !== 'send_alimtalk') {
+        if (!['send_alimtalk', 'send_sms'].includes(step.action.type)) {
           console.log(`⏭️ 지원하지 않는 액션 타입: ${step.action.type}`);
           continue;
         }
@@ -1053,6 +1053,8 @@ export async function POST(request: NextRequest) {
 // 개별 스텝 실행
 async function executeStep(step: any, targetGroup: any, workflow: Workflow, enableRealSending: boolean, targetTemplateMappings: any) {
   try {
+    // 🔥 SMS 타입도 알림톡 함수로 처리 (failover 이용)
+
     const templateId = step.action.templateId;
     const templateCode = step.action.templateCode;
     
@@ -1494,12 +1496,18 @@ async function executeStep(step: any, targetGroup: any, workflow: Workflow, enab
         console.log(`📤 대상자: ${target.name} (${target.phoneNumber})`);
         console.log(`📋 최종 개인화 변수:`, personalizedVariables);
 
+        // 🔥 SMS 타입일 때는 selectedTemplates의 content 사용
+        const finalContent = step.action.type === 'send_sms' 
+          ? workflow.message_config?.selectedTemplates?.[0]?.templateContent || processedContent
+          : processedContent;
+
         const result = await sendAlimtalk({
           templateId: actualTemplateId,
-          templateContent: processedContent as any,
+          templateContent: finalContent as any,
           phoneNumber: target.phoneNumber,
           variables: personalizedVariables,
-          enableRealSending
+          enableRealSending,
+          isSmsType: step.action.type === 'send_sms' // 🔥 SMS 타입 여부 전달
         });
 
         messageResults.push({
@@ -1600,8 +1608,20 @@ async function getTargetsFromGroup(targetGroup: any) {
         email: email,
         rawData: eventData // 웹훅 이벤트 데이터를 원본 데이터로 사용
       }];
+        }
+
+    // 🔥 Custom 타입: customTargets에서 직접 대상자 추출
+    if (targetGroup.type === 'custom' && targetGroup.customTargets) {
+      console.log(`📋 Custom 대상자 추출: ${targetGroup.customTargets.length}명`);
+      return targetGroup.customTargets.map((target: any) => ({
+        id: target.id || 'custom_target',
+        name: target.name || target.contact,
+        phoneNumber: target.contact,
+        email: target.email || '',
+        rawData: target.data || target
+      }));
     }
-    
+
     // MySQL 동적 쿼리 실행하여 실제 대상자 조회
     if (targetGroup.type === 'dynamic' && targetGroup.dynamicQuery?.sql) {
       console.log(`🔍 대상자 조회 시작 - MySQL API 호출 사용`);
@@ -1700,19 +1720,21 @@ async function getTargetsFromGroup(targetGroup: any) {
   ];
 }
 
-// 알림톡 발송
+// 알림톡 발송 (SMS 타입시 failover 이용)
 async function sendAlimtalk({
   templateId,
   templateContent,
   phoneNumber,
   variables,
-  enableRealSending
+  enableRealSending,
+  isSmsType = false
 }: {
   templateId: string;
   templateContent: any;
   phoneNumber: string;
   variables: Record<string, string>;
   enableRealSending: boolean;
+  isSmsType?: boolean;
 }) {
   if (!enableRealSending) {
     // 테스트 모드
@@ -1747,7 +1769,13 @@ async function sendAlimtalk({
   // 변수 치환된 메시지 내용 생성 (로깅용)
   const processedContent = templateContent.replace(/#{(\w+)}/g, (match, key) => variables[key] || match);
 
-  const messageData = {
+  // 🔥 SMS 타입일 때는 직접 SMS 타입으로 발송
+  const messageData = isSmsType ? {
+    to: cleanPhoneNumber,
+    from: SMS_SENDER_NUMBER,
+    type: processedContent.length > 45 ? 'LMS' : 'SMS', // 🔥 직접 SMS/LMS 타입
+    text: processedContent // 🔥 실제 SMS 내용 (kakaoOptions 없음)
+  } : {
     to: cleanPhoneNumber, // 🔥 정리된 전화번호 사용
     from: SMS_SENDER_NUMBER,
     type: 'ATA',
@@ -1758,10 +1786,16 @@ async function sendAlimtalk({
     }
   };
 
-  console.log(`📱 실제 알림톡 발송: ${cleanPhoneNumber} - 템플릿: ${templateId}`);
-  console.log(`📋 메시지 내용 (미리보기): ${processedContent}`);
-  console.log(`🔑 발신프로필: ${pfId}`);
-  console.log(`🔧 CoolSMS 변수:`, coolsmsVariables);
+  if (isSmsType) {
+    console.log(`📱 SMS failover 발송: ${cleanPhoneNumber}`);
+    console.log(`📋 SMS 내용: ${processedContent}`);
+    console.log(`🔧 의도적 알림톡 실패 → SMS 대체 발송`);
+  } else {
+    console.log(`📱 실제 알림톡 발송: ${cleanPhoneNumber} - 템플릿: ${templateId}`);
+    console.log(`📋 메시지 내용 (미리보기): ${processedContent}`);
+    console.log(`🔑 발신프로필: ${pfId}`);
+    console.log(`🔧 CoolSMS 변수:`, coolsmsVariables);
+  }
 
   const response = await fetch('https://api.coolsms.co.kr/messages/v4/send', {
     method: 'POST',
@@ -1810,4 +1844,6 @@ function getPfIdForTemplate(templateId: string): string {
   }
   
   return KAKAO_SENDER_KEY || '';
-} 
+}
+
+ 

@@ -6,7 +6,7 @@ import type {
   PersonalizationSettings,
   PersonalizationTarget 
 } from '@/lib/types/workflow';
-import { personalizationService } from './personalization-service';
+import { clientPersonalizationService } from './personalization-service-client';
 
 // ExecutionTarget를 PersonalizationTarget과 호환되도록 수정
 interface ExecutionTarget {
@@ -243,14 +243,18 @@ export class WorkflowExecutionService {
     templateContent: string
   ): Promise<void> {
     
-    if (action.type !== 'send_alimtalk') {
+    if (!['send_alimtalk', 'send_sms'].includes(action.type)) {
       console.log(`액션 타입 ${action.type}은 아직 지원되지 않습니다.`);
       return;
     }
 
     if (!action.personalization?.enabled) {
       // 개인화 비활성화 시 기존 방식으로 발송
-      await this.sendBulkMessages(targets, templateContent, action.templateId!);
+      if (action.type === 'send_alimtalk') {
+        await this.sendBulkMessages(targets, templateContent, action.templateId!);
+      } else if (action.type === 'send_sms') {
+        await this.sendBulkSmsMessages(targets, templateContent);
+      }
       return;
     }
 
@@ -259,7 +263,7 @@ export class WorkflowExecutionService {
 
     // 개인화된 메시지 생성
     console.log('개인화된 메시지 생성 시작...');
-    const personalizedMessages = await personalizationService.generatePersonalizedMessages(
+    const personalizedMessages = await clientPersonalizationService.generatePersonalizedMessages(
       personalizationTargets,
       templateContent,
       action.personalization
@@ -280,7 +284,11 @@ export class WorkflowExecutionService {
     console.log(`개인화 완료: ${successfulMessages.length}/${convertedMessages.length}개 메시지`);
 
     // 개인화된 메시지 발송
-    await this.sendPersonalizedMessages(successfulMessages, action.templateId!);
+    if (action.type === 'send_alimtalk') {
+      await this.sendPersonalizedMessages(successfulMessages, action.templateId!);
+    } else if (action.type === 'send_sms') {
+      await this.sendPersonalizedSmsMessages(successfulMessages);
+    }
 
     // 실패한 메시지 로깅
     const failedMessages = convertedMessages.filter(msg => msg.error);
@@ -416,6 +424,98 @@ export class WorkflowExecutionService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * SMS 대량 발송 (개인화 없음)
+   */
+  async sendBulkSmsMessages(targets: ExecutionTarget[], content: string): Promise<void> {
+    console.log(`📱 SMS 대량 발송 시작: ${targets.length}개 대상`);
+    
+    const { sendMessage } = await import('../services/message-sending-service');
+    
+    // SMS/LMS 결정 (45자 기준)
+    const messageType = content.length > 45 ? 'lms' : 'sms';
+    
+    const batches = this.splitMessagesIntoBatches(targets, 10); // 10개씩 배치
+    
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      console.log(`📤 SMS 배치 ${i + 1}/${batches.length} 발송 (${batch.length}개)`);
+      
+      // 배치 내 메시지들을 병렬로 발송
+      const promises = batch.map(async (target) => {
+        try {
+          const result = await sendMessage({
+            to: target.contact,
+            message: content,
+            // SMS로 강제 발송 (templateId 제거)
+            enableRealSending: true
+          });
+          
+          if (!result.success) {
+            console.error(`SMS 발송 실패 (${target.contact}):`, result.error);
+          }
+        } catch (error) {
+          console.error(`SMS 발송 오류 (${target.contact}):`, error);
+        }
+      });
+      
+      await Promise.all(promises);
+      
+      // 배치 간 딜레이 (API 제한 고려)
+      if (i < batches.length - 1) {
+        await this.delay(1000); // 1초 대기
+      }
+    }
+    
+    console.log('✅ SMS 대량 발송 완료');
+  }
+
+  /**
+   * 개인화된 SMS 메시지 발송
+   */
+  async sendPersonalizedSmsMessages(messages: PersonalizedMessage[]): Promise<void> {
+    console.log(`📱 개인화된 SMS 발송 시작: ${messages.length}개 메시지`);
+    
+    const { sendMessage } = await import('../services/message-sending-service');
+    
+    const batches = this.splitMessagesIntoBatches(messages, 10); // 10개씩 배치
+    
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      console.log(`📤 개인화 SMS 배치 ${i + 1}/${batches.length} 발송 (${batch.length}개)`);
+      
+      // 배치 내 메시지들을 병렬로 발송
+      const promises = batch.map(async (msg) => {
+        try {
+          // SMS/LMS 결정 (45자 기준)
+          const messageType = msg.personalizedContent.length > 45 ? 'lms' : 'sms';
+          
+          const result = await sendMessage({
+            to: msg.contact,
+            message: msg.personalizedContent,
+            // SMS로 강제 발송 (templateId 제거)
+            enableRealSending: true
+          });
+          
+          if (!result.success) {
+            console.error(`개인화 SMS 발송 실패 (${msg.contact}):`, result.error);
+          }
+        } catch (error) {
+          console.error(`개인화 SMS 발송 오류 (${msg.contact}):`, error);
+        }
+      });
+      
+      await Promise.all(promises);
+      
+      // 배치 간 딜레이 (API 제한 고려)
+      if (i < batches.length - 1) {
+        await this.delay(1000); // 1초 대기
+      }
+    }
+    
+    console.log('✅ 개인화된 SMS 발송 완료');
   }
 }
 
